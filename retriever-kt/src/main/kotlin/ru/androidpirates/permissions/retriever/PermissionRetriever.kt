@@ -509,7 +509,7 @@ class PermissionRetriever {
             /**
              * @return singleton instance of global settings
              */
-            @JvmStatic val instance: Global by lazy { Holder.INSTANCE }
+            @JvmStatic internal val instance: Global by lazy { Holder.INSTANCE }
 
             /**
              * This method defines usage of "silent mode". Like as
