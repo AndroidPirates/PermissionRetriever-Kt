@@ -10,7 +10,7 @@ Install
 ------- 
 
 ```groove
-implementation 'ru.androidpirates.permissions:retriever-kt:1.0.0'
+implementation 'ru.androidpirates.permissions:retriever-kt:1.0.1'
 ```
 
 Usage
