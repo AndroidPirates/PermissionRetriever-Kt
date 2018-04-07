@@ -39,13 +39,17 @@ android {
         it.generateBuildConfig.enabled = false
     }
 }
-apply from: '../publishing.gradle'
 
 dokka {
-    outputFormat = 'html'
+    outputFormat = 'javadoc'
     outputDirectory = "$buildDir/javadoc"
+    sourceDirs = files('src/main/kotlin')
+    packageOptions {
+        prefix = 'retriever'
+    }
 }
-javadoc.dependsOn dokka
+
+apply from: '../publishing.gradle'
 
 configurations {
     ktlint
