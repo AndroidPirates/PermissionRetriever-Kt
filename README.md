@@ -18,7 +18,7 @@ Usage
 
 ```kotlin
 class SomeClass { /* extends android.app.Activity or android.app.Fragment or android.support.v4.app.Fragment*/
-    private val permissionRetriever = PermissionRetriever();
+    private val permissionRetriever = PermissionRetriever()
         
     private fun onCapturePhotoClicked() {
         permissionRetriever
