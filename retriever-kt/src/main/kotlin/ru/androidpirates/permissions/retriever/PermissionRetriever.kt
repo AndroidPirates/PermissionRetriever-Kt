@@ -32,8 +32,8 @@ import android.text.TextUtils
 import android.util.Log
 
 class PermissionRetriever {
-    private var pendingIfGrantedAction: Runnable? = null
-    private var pendingIfUnacceptedAction: Runnable? = null
+    private var pendingIfGrantedAction: (() -> Unit)? = null
+    private var pendingIfUnacceptedAction: (() -> Unit)? = null
     private var appCompatFragment: android.support.v4.app.Fragment? = null
     private var platformFragment: android.app.Fragment? = null
     private var activity: Activity? = null
@@ -126,7 +126,6 @@ class PermissionRetriever {
      */
     @JvmOverloads
     fun withPermission(permission: String, explanation: String? = null): PermissionRetriever {
-
         if (mIsRewriteProtectionDisabled) {
             if (!TextUtils.isEmpty(permission)) {
                 mPermissionsRationalesMap[permission] = explanation ?: ""
@@ -152,7 +151,7 @@ class PermissionRetriever {
      *                     one of the requested permissions
      */
     @JvmOverloads
-    fun run(caller: Any, ifGranted: Runnable? = null, ifUnaccepted: Runnable? = null) {
+    fun run(caller: Any, ifGranted: (() -> Unit)? = null, ifUnaccepted: (() -> Unit)? = null) {
         if (mIsRewriteProtectionDisabled) {
             setTrueCaller(caller)
             pendingIfGrantedAction = ifGranted
@@ -213,7 +212,7 @@ class PermissionRetriever {
      */
     fun clear() {
         mPermissionsRationalesMap.clear()
-        isSilentMode = false
+        isSilentMode = null
         platformFragment = null
         isSilentMode = null
         isLoggingEnabled = null
@@ -282,12 +281,12 @@ class PermissionRetriever {
     }
 
     private fun runGranted() {
-        pendingIfGrantedAction?.run()
+        pendingIfGrantedAction?.invoke()
         clear()
     }
 
     private fun runUnaccepted() {
-        pendingIfUnacceptedAction?.run()
+        pendingIfUnacceptedAction?.invoke()
         clear()
     }
 
@@ -313,19 +312,19 @@ class PermissionRetriever {
     }
 
     private fun somePermissionPermanentlyDenied(): Boolean {
-        mPermissionsRationalesMap.keys.forEach {
-            if (!shouldShowRequestPermissionRationale(it)) {
-                return true
-            }
+        mPermissionsRationalesMap.keys.filter {
+            !shouldShowRequestPermissionRationale(it)
+        }.forEach {
+            return true
         }
         return false
     }
 
     private fun shouldShowRationale(): Boolean {
-        mPermissionsRationalesMap.keys.forEach {
-            if (shouldShowRequestPermissionRationale(it)) {
-                return true
-            }
+        mPermissionsRationalesMap.keys.filter {
+            shouldShowRequestPermissionRationale(it)
+        }.forEach {
+            return true
         }
         return false
     }
