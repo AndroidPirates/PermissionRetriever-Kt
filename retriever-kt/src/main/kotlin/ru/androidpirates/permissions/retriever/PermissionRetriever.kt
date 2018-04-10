@@ -212,14 +212,13 @@ class PermissionRetriever {
      */
     fun clear() {
         mPermissionsRationalesMap.clear()
-        isSilentMode = null
         platformFragment = null
-        isSilentMode = null
-        isLoggingEnabled = null
         appCompatFragment = null
         activity = null
         pendingIfGrantedAction = null
         pendingIfUnacceptedAction = null
+        isSilentMode = null
+        isLoggingEnabled = null
         mIsRewriteProtectionDisabled = true
     }
 
