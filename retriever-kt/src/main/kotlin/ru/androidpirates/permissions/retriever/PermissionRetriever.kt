@@ -23,7 +23,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.support.annotation.PluralsRes
 import android.support.annotation.StringRes
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
@@ -267,9 +266,9 @@ class PermissionRetriever {
         var allGranted = true
         if (!mPermissionsRationalesMap.isEmpty()) {
             val granted = ArrayList<Map.Entry<String, Any>>()
-            for (entry in mPermissionsRationalesMap.entries) {
-                if (hasPermission(context!!, entry.key)) {
-                    granted.add(entry)
+            mPermissionsRationalesMap.forEach {
+                if (hasPermission(context!!, it.key)) {
+                    granted.add(it)
                 } else {
                     allGranted = false
                 }
@@ -375,8 +374,11 @@ class PermissionRetriever {
 
     private fun prepareDialog(): AlertDialog.Builder {
         val permCount = mPermissionsRationalesMap.size
-        val message = StringBuilder(
-                getPlurals(R.plurals.perm_retriever_message_denied, permCount))
+        val message = StringBuilder(getQuantity(
+                R.string.perm_retriever_message_denied_one,
+                R.string.perm_retriever_message_denied_many,
+                permCount
+        ))
 
         for ((permission, explanation) in mPermissionsRationalesMap) {
             message.append("\n").append(cutPermissionName(permission))
@@ -392,7 +394,11 @@ class PermissionRetriever {
             }
         }
         return AlertDialog.Builder(context!!)
-                .setTitle(getPlurals(R.plurals.perm_retriever_title_denied, permCount))
+                .setTitle(getQuantity(
+                        R.string.perm_retriever_title_denied_one,
+                        R.string.perm_retriever_title_denied_many,
+                        permCount
+                ))
                 .setMessage(message)
                 .setOnCancelListener { runUnaccepted() }
                 .setNegativeButton(R.string.perm_retriever_button_cancel) { _, _ ->
@@ -410,8 +416,8 @@ class PermissionRetriever {
                 .setData(Uri.fromParts("package", context!!.packageName, null))
     }
 
-    private fun getPlurals(@PluralsRes id: Int, quantity: Int): String {
-        return context!!.resources.getQuantityString(id, quantity)
+    private fun getQuantity(@StringRes oneId: Int, @StringRes manyId: Int, quantity: Int): String {
+        return context!!.getString(if (quantity > 1) manyId else oneId)
     }
 
     companion object {

@@ -10,7 +10,7 @@ Install
 ------- 
 
 ```groove
-implementation 'ru.androidpirates.permissions:retriever-kt:1.0.2'
+implementation 'ru.androidpirates.permissions:retriever-kt:1.0.3'
 ```
 
 Usage
@@ -18,7 +18,7 @@ Usage
 
 ```kotlin
 class SomeClass { /* extends android.app.Activity or android.app.Fragment or android.support.v4.app.Fragment*/
-    private val permissionRetriever = PermissionRetriever()
+    private val permissionRetriever: PermissionRetriever = PermissionRetriever()
         
     private fun onCapturePhotoClicked() {
         permissionRetriever
@@ -54,15 +54,11 @@ In-box we are supports only two translations: English and Russian. Below you can
     <string name="perm_retriever_button_settings">Settings</string>
     <string name="perm_retriever_button_cancel">Cancel</string>
 
-    <plurals name="perm_retriever_message_denied">
-        <item quantity="one">For correctly app working we need to you grant this permission:\n</item>
-        <item quantity="many">For correctly app working we need to you grant this permissions list:\n</item>
-    </plurals>
+    <string name="perm_retriever_message_denied_one">For correctly app working we need to you grant this permission:\n</string>
+    <string name="perm_retriever_message_denied_many">For correctly app working we need to you grant this permissions list:\n</string>
 
-    <plurals name="perm_retriever_title_denied">
-        <item quantity="one">You have denied permission</item>
-        <item quantity="many">You have denied permissions</item>
-    </plurals>
+    <string name="perm_retriever_title_denied_one">You have denied permission</string>
+    <string name="perm_retriever_title_denied_many">You have denied permissions</string>
 </resources>
 ```
 
