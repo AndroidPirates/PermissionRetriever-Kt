@@ -27,27 +27,30 @@ import android.support.annotation.StringRes
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.support.v7.app.AlertDialog
+import android.text.TextUtils
 import android.util.Log
+import android.app.Fragment as PlatformFragment
+import android.support.v4.app.Fragment as SupportFragment
 
 @Suppress("DEPRECATION")
 class PermissionRetriever {
     private var pendingIfGrantedAction: (() -> Unit)? = null
     private var pendingIfUnacceptedAction: (() -> Unit)? = null
-    private var appCompatFragment: android.support.v4.app.Fragment? = null
-    private var platformFragment: android.app.Fragment? = null
+    private var appCompatFragment: SupportFragment? = null
+    private var platformFragment: PlatformFragment? = null
     private var activity: Activity? = null
     private var isLoggingEnabled: Boolean? = null
     private var isSilentMode: Boolean? = null
 
-    private var mIsRewriteProtectionDisabled = true
+    private var isRewriteProtectionDisabled = true
 
-    private val mPermissionsRationalesMap: MutableMap<String, Any> = HashMap()
+    private val permissionsRationalesMap: MutableMap<String, Any> = HashMap()
 
-    private val context: Context?
+    private val context: Context
         get() = when {
             platformFragment != null -> platformFragment!!.activity
-            appCompatFragment != null -> appCompatFragment!!.activity
-            else -> activity
+            appCompatFragment != null -> appCompatFragment!!.activity!!
+            else -> activity!!
         }
 
     /**
@@ -62,7 +65,7 @@ class PermissionRetriever {
      * @return this instance for chained calls
      */
     fun silentMode(isSilentMode: Boolean): PermissionRetriever {
-        if (mIsRewriteProtectionDisabled) {
+        if (isRewriteProtectionDisabled) {
             this.isSilentMode = isSilentMode
         } else {
             logRewriteProtectionEnabled()
@@ -80,7 +83,7 @@ class PermissionRetriever {
      * @return this instance for chained calls
      */
     fun logging(isLoggingEnabled: Boolean): PermissionRetriever {
-        if (mIsRewriteProtectionDisabled) {
+        if (isRewriteProtectionDisabled) {
             this.isLoggingEnabled = isLoggingEnabled
         } else {
             logRewriteProtectionEnabled()
@@ -100,9 +103,9 @@ class PermissionRetriever {
      * @see android.Manifest.permission
      */
     fun withPermission(permission: String, @StringRes explanation: Int): PermissionRetriever {
-        if (mIsRewriteProtectionDisabled) {
+        if (isRewriteProtectionDisabled) {
             if (permission.isNotBlank()) {
-                mPermissionsRationalesMap[permission] = explanation
+                permissionsRationalesMap[permission] = explanation
             } else {
                 logPermissionIsEmpty()
             }
@@ -125,9 +128,9 @@ class PermissionRetriever {
      */
     @JvmOverloads
     fun withPermission(permission: String, explanation: String? = null): PermissionRetriever {
-        if (mIsRewriteProtectionDisabled) {
+        if (isRewriteProtectionDisabled) {
             if (permission.isNotBlank()) {
-                mPermissionsRationalesMap[permission] = explanation ?: ""
+                permissionsRationalesMap[permission] = explanation ?: ""
             } else {
                 logPermissionIsEmpty()
             }
@@ -168,15 +171,14 @@ class PermissionRetriever {
      * of code.
      *
      * @param caller an object who can be instantiated from [android.app.Fragment]
-     *               or [android.support.v4.app.Fragment]
-     *               or [android.app.Activity]
+     * or [android.support.v4.app.Fragment] or [android.app.Activity]
      * @param ifGranted the runnable who will be invoked when a user will accept the requested
      *                  permissions
      * @param ifUnaccepted the runnable who will be invoked when a user will decline at least
      *                     one of the requested permissions
      */
     fun run(caller: Any, ifGranted: (() -> Unit)?, ifUnaccepted: (() -> Unit)?) {
-        if (mIsRewriteProtectionDisabled) {
+        if (isRewriteProtectionDisabled) {
             setTrueCaller(caller)
             pendingIfGrantedAction = ifGranted
             pendingIfUnacceptedAction = ifUnaccepted
@@ -186,7 +188,7 @@ class PermissionRetriever {
             if (isLoggingEnabled == null) {
                 isLoggingEnabled = Global.isLoggingEnabled
             }
-            mIsRewriteProtectionDisabled = false
+            isRewriteProtectionDisabled = false
             checkAndRun()
         } else {
             logRewriteProtectionEnabled()
@@ -208,26 +210,19 @@ class PermissionRetriever {
      *         `PermissionRetriever` will do some stuff
      */
     fun onPermissionResult(requestCode: Int): Boolean {
-        if (requestCode != REQUEST_PERMISSIONS_CODE) {
-            return false
-        } else {
-            if (context != null) {
-                if (check()) {
-                    runGranted()
-                } else {
-                    if (somePermissionPermanentlyDenied()) {
-                        showRationaleToSettings()
-                    } else {
-                        showRationaleToRequest()
-                    }
-                }
+        if (requestCode == REQUEST_PERMISSIONS_CODE) {
+            if (check()) {
+                runGranted()
             } else {
-                if (isLoggingEnabled!!) {
-                    Log.e(LOG_TAG, "Context is null. I'm gonna do nothing!!!")
+                if (somePermissionPermanentlyDenied()) {
+                    showRationaleToSettings()
+                } else {
+                    showRationaleToRequest()
                 }
             }
             return true
         }
+        return false
     }
 
     /**
@@ -235,7 +230,7 @@ class PermissionRetriever {
      * automatically after calling `ifGranted` or `ifUnaccepted` blocks.
      */
     fun clear() {
-        mPermissionsRationalesMap.clear()
+        permissionsRationalesMap.clear()
         platformFragment = null
         appCompatFragment = null
         activity = null
@@ -243,15 +238,13 @@ class PermissionRetriever {
         pendingIfUnacceptedAction = null
         isSilentMode = null
         isLoggingEnabled = null
-        mIsRewriteProtectionDisabled = true
+        isRewriteProtectionDisabled = true
     }
 
     private fun logRewriteProtectionEnabled() {
         if (isLoggingEnabled!!) {
-            Log.e(
-                    LOG_TAG, "Rewrite protection is enabled, call clear() for re-use this " +
-                    "instance. @" + hashCode()
-            )
+            Log.e(LOG_TAG, "Rewrite protection is enabled, call clear() for re-use this " +
+                    "instance. @" + hashCode())
         }
     }
 
@@ -264,43 +257,37 @@ class PermissionRetriever {
     @Throws(IllegalArgumentException::class)
     private fun setTrueCaller(caller: Any) {
         when (caller) {
-            is android.app.Fragment -> platformFragment = caller
-            is android.support.v4.app.Fragment -> appCompatFragment = caller
+            is PlatformFragment -> platformFragment = caller
+            is SupportFragment -> appCompatFragment = caller
             is Activity -> activity = caller
             else -> throw IllegalArgumentException("Passed wrong caller object")
         }
     }
 
     private fun checkAndRun() {
-        if (context != null) {
-            if (check()) {
-                runGranted()
-            } else {
-                if (shouldShowRationale()) {
-                    showRationaleToRequest()
-                } else {
-                    request()
-                }
-            }
+        if (check()) {
+            runGranted()
         } else {
-            if (isLoggingEnabled!!) {
-                Log.e(LOG_TAG, "Context is null. I'm gonna do nothing!!!")
+            if (shouldShowRationale()) {
+                showRationaleToRequest()
+            } else {
+                request()
             }
         }
     }
 
     private fun check(): Boolean {
         var allGranted = true
-        if (!mPermissionsRationalesMap.isEmpty()) {
+        if (!permissionsRationalesMap.isEmpty()) {
             val granted = ArrayList<Map.Entry<String, Any>>()
-            mPermissionsRationalesMap.forEach {
-                if (hasPermission(context!!, it.key)) {
+            permissionsRationalesMap.forEach {
+                if (hasPermission(context, it.key)) {
                     granted.add(it)
                 } else {
                     allGranted = false
                 }
             }
-            mPermissionsRationalesMap.entries.removeAll(granted)
+            permissionsRationalesMap.entries.removeAll(granted)
         }
         return allGranted
     }
@@ -316,7 +303,7 @@ class PermissionRetriever {
     }
 
     private fun request() {
-        requestPermissions(mPermissionsRationalesMap.keys.toTypedArray())
+        requestPermissions(permissionsRationalesMap.keys.toTypedArray())
     }
 
     private fun requestPermissions(permissions: Array<String>) {
@@ -327,10 +314,8 @@ class PermissionRetriever {
                 platformFragment!!.requestPermissions(permissions, REQUEST_PERMISSIONS_CODE)
             } else {
                 if (isLoggingEnabled!!) {
-                    Log.e(
-                            LOG_TAG, "Current sdk < 23 ver api and used platform's Fragment. " +
-                            "Request permissions wasn't called"
-                    )
+                    Log.e(LOG_TAG, "Current sdk < 23 ver api and used platform's Fragment. " +
+                            "Request permissions wasn't called")
                 }
             }
         } else {
@@ -339,11 +324,11 @@ class PermissionRetriever {
     }
 
     private fun somePermissionPermanentlyDenied(): Boolean {
-        return mPermissionsRationalesMap.keys.any { !shouldShowRequestPermissionRationale(it) }
+        return permissionsRationalesMap.keys.any { !shouldShowRequestPermissionRationale(it) }
     }
 
     private fun shouldShowRationale(): Boolean {
-        return mPermissionsRationalesMap.keys.any { shouldShowRequestPermissionRationale(it) }
+        return permissionsRationalesMap.keys.any { shouldShowRequestPermissionRationale(it) }
     }
 
     private fun shouldShowRequestPermissionRationale(permission: String): Boolean {
@@ -356,11 +341,9 @@ class PermissionRetriever {
                     platformFragment!!.shouldShowRequestPermissionRationale(permission)
                 } else {
                     if (isLoggingEnabled!!) {
-                        Log.w(
-                                LOG_TAG, "Current sdk < 23 ver api and used platform's " +
+                        Log.w(LOG_TAG, "Current sdk < 23 ver api and used platform's " +
                                 "Fragment. Trying to get value from " +
-                                "Activity.shouldShowRequestPermissionRationale()"
-                        )
+                                "Activity.shouldShowRequestPermissionRationale()")
                     }
                     ActivityCompat.shouldShowRequestPermissionRationale(activity!!, permission)
                 }
@@ -385,7 +368,7 @@ class PermissionRetriever {
         if (!isSilentMode!!) {
             prepareDialog()
                     .setPositiveButton(R.string.perm_retriever_button_settings) { _, _ ->
-                        context!!.startActivity(intentToSettings())
+                        context.startActivity(intentToSettings())
                     }
                     .show()
         } else {
@@ -394,21 +377,19 @@ class PermissionRetriever {
     }
 
     private fun prepareDialog(): AlertDialog.Builder {
-        val permCount = mPermissionsRationalesMap.size
-        val message = StringBuilder(
-                getQuantity(
-                        R.string.perm_retriever_message_denied_one,
-                        R.string.perm_retriever_message_denied_many,
-                        permCount
-                )
-        )
+        val permCount = permissionsRationalesMap.size
+        val message = StringBuilder(getQuantity(
+                R.string.perm_retriever_message_denied_one,
+                R.string.perm_retriever_message_denied_many,
+                permCount
+        ))
 
-        for ((permission, explanation) in mPermissionsRationalesMap) {
+        for ((permission, explanation) in permissionsRationalesMap) {
             message.append("\n").append(cutPermissionName(permission))
 
             if (explanation is Int) {
                 if (explanation != -1) {
-                    message.append(" - ").append(context!!.getString(explanation))
+                    message.append(" - ").append(context.getString(explanation))
                 }
             } else if (explanation is String) {
                 if (explanation.isNotBlank()) {
@@ -416,14 +397,12 @@ class PermissionRetriever {
                 }
             }
         }
-        return AlertDialog.Builder(context!!)
-                .setTitle(
-                        getQuantity(
-                                R.string.perm_retriever_title_denied_one,
-                                R.string.perm_retriever_title_denied_many,
-                                permCount
-                        )
-                )
+        return AlertDialog.Builder(context)
+                .setTitle(getQuantity(
+                        R.string.perm_retriever_title_denied_one,
+                        R.string.perm_retriever_title_denied_many,
+                        permCount
+                ))
                 .setMessage(message)
                 .setOnCancelListener { runUnaccepted() }
                 .setNegativeButton(R.string.perm_retriever_button_cancel) { _, _ ->
@@ -438,11 +417,11 @@ class PermissionRetriever {
 
     private fun intentToSettings(): Intent {
         return Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                .setData(Uri.fromParts("package", context!!.packageName, null))
+                .setData(Uri.fromParts("package", context.packageName, null))
     }
 
     private fun getQuantity(@StringRes oneId: Int, @StringRes manyId: Int, quantity: Int): String {
-        return context!!.getString(if (quantity > 1) manyId else oneId)
+        return context.getString(if (quantity > 1) manyId else oneId)
     }
 
     companion object {
@@ -454,8 +433,7 @@ class PermissionRetriever {
          *
          * @param permission permission for check
          * @param caller an object who can be instantiated from [android.app.Fragment]
-         *               or [android.support.v4.app.Fragment]
-         *               or [android.app.Activity]
+         * or [android.support.v4.app.Fragment] or [android.app.Activity]
          *
          * @return true if passed permission are grated
          *
@@ -472,8 +450,7 @@ class PermissionRetriever {
          *
          * @param permissions array of permission for check
          * @param caller an object who can be instantiated from [android.app.Fragment]
-         *               or [android.support.v4.app.Fragment]
-         *               or [android.app.Activity]
+         * or [android.support.v4.app.Fragment] or [android.app.Activity]
          *
          * @return true if all passed permissions are grated
          *
@@ -491,8 +468,7 @@ class PermissionRetriever {
          *
          * @param permissions collection of permission for check
          * @param caller an object who can be instantiated from [android.app.Fragment]
-         *               or [android.support.v4.app.Fragment]
-         *               or [android.app.Activity]
+         * or [android.support.v4.app.Fragment] or [android.app.Activity]
          *
          * @return true if all passed permissions are grated
          *
@@ -513,10 +489,10 @@ class PermissionRetriever {
         @Throws(IllegalArgumentException::class)
         private fun getContextFromCaller(caller: Any): Context {
             return when (caller) {
-                is android.app.Fragment -> caller.activity
-                is android.support.v4.app.Fragment -> caller.activity!!
-                else -> caller as? Activity
-                        ?: throw IllegalArgumentException("Cant get context from caller")
+                is PlatformFragment -> caller.activity
+                is SupportFragment -> caller.activity!!
+                is Activity -> caller
+                else -> throw IllegalArgumentException("Cant get context from caller")
             }
         }
     }
