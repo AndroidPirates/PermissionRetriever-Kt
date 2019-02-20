@@ -21,6 +21,16 @@ apply plugin: 'com.github.dcendents.android-maven'
 group = GROUP
 version = VERSION_NAME
 
+task cleanBuildInstall(type: GradleBuild) {
+    group = "publishing"
+    tasks = ['clean', 'build', 'install']
+}
+
+task cleanBuildPublish(type: GradleBuild) {
+    group = "publishing"
+    tasks = ['cleanBuildInstall', 'bintrayUpload']
+}
+
 task sourcesJar(type: Jar) {
     classifier = 'sources'
     from android.sourceSets.main.kotlin.srcDirs

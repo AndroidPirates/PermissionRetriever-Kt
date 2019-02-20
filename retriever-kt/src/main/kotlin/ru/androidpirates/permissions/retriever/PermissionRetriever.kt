@@ -27,9 +27,9 @@ import android.support.annotation.StringRes
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.support.v7.app.AlertDialog
-import android.text.TextUtils
 import android.util.Log
 
+@Suppress("DEPRECATION")
 class PermissionRetriever {
     private var pendingIfGrantedAction: (() -> Unit)? = null
     private var pendingIfUnacceptedAction: (() -> Unit)? = null
@@ -101,7 +101,7 @@ class PermissionRetriever {
      */
     fun withPermission(permission: String, @StringRes explanation: Int): PermissionRetriever {
         if (mIsRewriteProtectionDisabled) {
-            if (!TextUtils.isEmpty(permission)) {
+            if (permission.isNotBlank()) {
                 mPermissionsRationalesMap[permission] = explanation
             } else {
                 logPermissionIsEmpty()
@@ -126,7 +126,7 @@ class PermissionRetriever {
     @JvmOverloads
     fun withPermission(permission: String, explanation: String? = null): PermissionRetriever {
         if (mIsRewriteProtectionDisabled) {
-            if (!TextUtils.isEmpty(permission)) {
+            if (permission.isNotBlank()) {
                 mPermissionsRationalesMap[permission] = explanation ?: ""
             } else {
                 logPermissionIsEmpty()
@@ -144,22 +144,47 @@ class PermissionRetriever {
      * @param caller an object who can be instantiated from [android.app.Fragment]
      *               or [android.support.v4.app.Fragment]
      *               or [android.app.Activity]
+     */
+    fun run(caller: Any) {
+        run(caller, null)
+    }
+
+    /**
+     * This method requests permissions and if when a user accepts it invokes the presented blocks
+     * of code.
+     *
+     * @param caller an object who can be instantiated from [android.app.Fragment]
+     *               or [android.support.v4.app.Fragment]
+     *               or [android.app.Activity]
+     * @param ifGranted the runnable who will be invoked when a user will accept the requested
+     *                  permissions
+     */
+    fun run(caller: Any, ifGranted: (() -> Unit)?) {
+        run(caller, ifGranted, null)
+    }
+
+    /**
+     * This method requests permissions and if when a user accepts it invokes the presented blocks
+     * of code.
+     *
+     * @param caller an object who can be instantiated from [android.app.Fragment]
+     *               or [android.support.v4.app.Fragment]
+     *               or [android.app.Activity]
      * @param ifGranted the runnable who will be invoked when a user will accept the requested
      *                  permissions
      * @param ifUnaccepted the runnable who will be invoked when a user will decline at least
      *                     one of the requested permissions
      */
-    @JvmOverloads
-    fun run(caller: Any, ifGranted: (() -> Unit)? = null, ifUnaccepted: (() -> Unit)? = null) {
+    fun run(caller: Any, ifGranted: (() -> Unit)?, ifUnaccepted: (() -> Unit)?) {
         if (mIsRewriteProtectionDisabled) {
             setTrueCaller(caller)
             pendingIfGrantedAction = ifGranted
             pendingIfUnacceptedAction = ifUnaccepted
             if (isSilentMode == null) {
-                isSilentMode = Global.instance.mIsSilentMode
+                isSilentMode = Global.isSilentMode
             }
             if (isLoggingEnabled == null) {
-                isLoggingEnabled = Global.instance.mIsLoggingEnabled
+                isLoggingEnabled = Global.isLoggingEnabled
             }
             mIsRewriteProtectionDisabled = false
             checkAndRun()
@@ -223,8 +248,10 @@ class PermissionRetriever {
 
     private fun logRewriteProtectionEnabled() {
         if (isLoggingEnabled!!) {
-            Log.e(LOG_TAG, "Rewrite protection is enabled, call clear() for re-use this " +
-                    "instance. @" + hashCode())
+            Log.e(
+                    LOG_TAG, "Rewrite protection is enabled, call clear() for re-use this " +
+                    "instance. @" + hashCode()
+            )
         }
     }
 
@@ -300,8 +327,10 @@ class PermissionRetriever {
                 platformFragment!!.requestPermissions(permissions, REQUEST_PERMISSIONS_CODE)
             } else {
                 if (isLoggingEnabled!!) {
-                    Log.e(LOG_TAG, "Current sdk < 23 ver api and used platform's Fragment. " +
-                            "Request permissions wasn't called")
+                    Log.e(
+                            LOG_TAG, "Current sdk < 23 ver api and used platform's Fragment. " +
+                            "Request permissions wasn't called"
+                    )
                 }
             }
         } else {
@@ -310,21 +339,11 @@ class PermissionRetriever {
     }
 
     private fun somePermissionPermanentlyDenied(): Boolean {
-        mPermissionsRationalesMap.keys.filter {
-            !shouldShowRequestPermissionRationale(it)
-        }.forEach {
-            return true
-        }
-        return false
+        return mPermissionsRationalesMap.keys.any { !shouldShowRequestPermissionRationale(it) }
     }
 
     private fun shouldShowRationale(): Boolean {
-        mPermissionsRationalesMap.keys.filter {
-            shouldShowRequestPermissionRationale(it)
-        }.forEach {
-            return true
-        }
-        return false
+        return mPermissionsRationalesMap.keys.any { shouldShowRequestPermissionRationale(it) }
     }
 
     private fun shouldShowRequestPermissionRationale(permission: String): Boolean {
@@ -337,9 +356,11 @@ class PermissionRetriever {
                     platformFragment!!.shouldShowRequestPermissionRationale(permission)
                 } else {
                     if (isLoggingEnabled!!) {
-                        Log.w(LOG_TAG, "Current sdk < 23 ver api and used platform's " +
+                        Log.w(
+                                LOG_TAG, "Current sdk < 23 ver api and used platform's " +
                                 "Fragment. Trying to get value from " +
-                                "Activity.shouldShowRequestPermissionRationale()")
+                                "Activity.shouldShowRequestPermissionRationale()"
+                        )
                     }
                     ActivityCompat.shouldShowRequestPermissionRationale(activity!!, permission)
                 }
@@ -374,11 +395,13 @@ class PermissionRetriever {
 
     private fun prepareDialog(): AlertDialog.Builder {
         val permCount = mPermissionsRationalesMap.size
-        val message = StringBuilder(getQuantity(
-                R.string.perm_retriever_message_denied_one,
-                R.string.perm_retriever_message_denied_many,
-                permCount
-        ))
+        val message = StringBuilder(
+                getQuantity(
+                        R.string.perm_retriever_message_denied_one,
+                        R.string.perm_retriever_message_denied_many,
+                        permCount
+                )
+        )
 
         for ((permission, explanation) in mPermissionsRationalesMap) {
             message.append("\n").append(cutPermissionName(permission))
@@ -388,17 +411,19 @@ class PermissionRetriever {
                     message.append(" - ").append(context!!.getString(explanation))
                 }
             } else if (explanation is String) {
-                if (!TextUtils.isEmpty(explanation)) {
+                if (explanation.isNotBlank()) {
                     message.append(" - ").append(explanation)
                 }
             }
         }
         return AlertDialog.Builder(context!!)
-                .setTitle(getQuantity(
-                        R.string.perm_retriever_title_denied_one,
-                        R.string.perm_retriever_title_denied_many,
-                        permCount
-                ))
+                .setTitle(
+                        getQuantity(
+                                R.string.perm_retriever_title_denied_one,
+                                R.string.perm_retriever_title_denied_many,
+                                permCount
+                        )
+                )
                 .setMessage(message)
                 .setOnCancelListener { runUnaccepted() }
                 .setNegativeButton(R.string.perm_retriever_button_cancel) { _, _ ->
@@ -458,8 +483,7 @@ class PermissionRetriever {
          */
         @JvmStatic fun hasAllPermissions(caller: Any, vararg permissions: String): Boolean {
             val context = getContextFromCaller(caller)
-            permissions.forEach { if (!hasPermission(context, it)) return false }
-            return true
+            return permissions.all { hasPermission(context, it) }
         }
 
         /**
@@ -497,43 +521,12 @@ class PermissionRetriever {
         }
     }
 
-    /**
-     * Global settings for [PermissionRetriever]
-     * */
-    class Global private constructor() {
-        internal var mIsLoggingEnabled = false
-        internal var mIsSilentMode = false
+    /** Global settings for [PermissionRetriever] */
+    object Global {
+        /** Turning on/off global logging */
+        @JvmField var isLoggingEnabled = false
 
-        private object Holder {
-            val INSTANCE = Global()
-        }
-
-        companion object {
-
-            /**
-             * @return singleton instance of global settings
-             */
-            @JvmStatic internal val instance: Global by lazy { Holder.INSTANCE }
-
-            /**
-             * This method defines usage of "silent mode". Like as
-             * [PermissionRetriever.silentMode], but have global effect
-             *
-             * @param silentMode value for turning on/off global "silent mode"
-             */
-            @JvmStatic fun setSilentMode(silentMode: Boolean) {
-                instance.mIsSilentMode = silentMode
-            }
-
-            /**
-             * This method defines usage of error logging. Like as
-             * [PermissionRetriever.logging], but have global effect
-             *
-             * @param loggingEnabled for turning on/off global logging
-             */
-            @JvmStatic fun setLoggingEnabled(loggingEnabled: Boolean) {
-                instance.mIsLoggingEnabled = loggingEnabled
-            }
-        }
+        /** Turning on/off global "silent mode" */
+        @JvmField var isSilentMode = false
     }
 }
